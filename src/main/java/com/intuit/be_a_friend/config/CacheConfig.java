@@ -16,7 +16,7 @@ public class CacheConfig {
     @Bean
     public Caffeine<Object, Object> caffeineConfig() {
         return Caffeine.newBuilder()
-                .expireAfterWrite(10, TimeUnit.MINUTES)  // Entries expire 10 minutes after last write
+                .expireAfterWrite(1, TimeUnit.MINUTES)  // Entries expire 10 minutes after last write
                 .maximumSize(100)  // Maximum 100 entries in the cache
                 .recordStats();    // Optional: Record cache statistics
     }

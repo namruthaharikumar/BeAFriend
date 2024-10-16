@@ -35,7 +35,7 @@ public class PostController {
     }
 
     @GetMapping("")
-    public Page<Post> getPostsByUserIds(@RequestHeader("Authorization") String token, Integer pageNumber) {
+    public Page<Post> getPostsByUserIds(@RequestHeader("Authorization") String token, Integer pageNumber, boolean isRefresh) {
         String username = jwtUtil.extractUsername(token.substring(7));
          UserInfo userInfo =  userService.getUserInfoByUserName(username);
         if (userInfo == null) {
@@ -43,6 +43,9 @@ public class PostController {
             throw new IllegalArgumentException("User not found");
         }
 
+        if(isRefresh) {
+            postService.evictNewFeedCache(userInfo.getUserId(),pageNumber);
+        }
          return postService.getPostsByUserIdsInReverseChronologicalOrder(userInfo.getUserId(), pageNumber);
     }
     @PostMapping("")
