@@ -17,8 +17,10 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -38,21 +40,42 @@ public class PostService {
 
     private static final Logger logger = LoggerFactory.getLogger(PostService.class);
 
-    @Cacheable(value = "postsByUser", key = "#userId + '_' + #pageNumber", condition = "#pageNumber == 1 || #pageNumber == 2")
+    @Cacheable(value = "postsByUser", key = "#userId + '_' + #pageNumber", condition = "#pageNumber<2")
     public Page<Post> getPostsByUserIdsInReverseChronologicalOrder(String userId, Integer pageNumber) {
         Pageable pageable = Pageable.ofSize(10).withPage(pageNumber);
         logger.info("Entering getPostsByUserIdsInReverseChronologicalOrder with userId: {}", userId);
 
-        List<String> followersIds = followerRepository.findFollowingUsersBySubscriberId(userId);
+        List<String> followersIds = getFollowersInBatches(userId);
         followersIds.add(userId);
         Page<Post> posts = postRepository.findPostsByUserIdInOrderByCreatedAtDesc(followersIds, pageable);
         logger.info("Exiting getPostsByUserIdsInReverseChronologicalOrder with {} posts on page {}", posts.getSize(), pageable.getPageNumber());
         return posts;
     }
 
+    @Cacheable(value = "followers", key = "#userId")
+    public List<String> getFollowersInBatches(String userId) {
+        logger.info("Fetching followers for user in paginated manner and caching: {}", userId);
+        List<String> allFollowers = new ArrayList<>();
+        int page = 0;
+        List<String> batch;
+        do {
+            batch = followerRepository.findFollowingUsersBySubscriberIdWithPagination(userId, Pageable.ofSize(100).withPage(page));
+            allFollowers.addAll(batch);
+            page++;
+        } while (!batch.isEmpty());
+        return allFollowers;
+    }
+
+    @CacheEvict(value = "followers", key = "#userId")
+    public void evictFollowersCache(String userId) {
+        logger.info("Followers cache is evicted for user: {}", userId);
+        return;
+    }
+
+
     @CacheEvict(value = "postsByUser", key = "#userId + '_' + #pageNumber")
-    public void evictNewFeedCache(Long postId, int page) {
-        logger.info("Post cache is evicted for post id: {} and page: {}", postId, page);
+    public void evictNewFeedCache(String userId, int pageNumber) {
+        logger.info("Post cache is evicted for post id: {} and page: {}", userId, pageNumber);
         return;
     }
 
@@ -87,7 +110,7 @@ public class PostService {
             throw new AccessDeniedException("User is not authorized to delete this post");
         }
         postRepository.delete(post);
-        updateCache(userInfo.getUserId());
+        updateNewsFeedCache(userInfo.getUserId());
         logger.info("Post deleted for user: {}", username);
     }
 
@@ -125,15 +148,16 @@ public class PostService {
         logger.info("Post commented for user: {}", username);
     }
 
-    public void updateCache(String userId) {
-        followerRepository.findSubscribers(userId).forEach(followerId -> {
+    @Async
+    public void updateNewsFeedCache(String userId) {
+        getFollowersInBatches(userId).forEach(followerId -> {
             logger.info("Evicting cache for user: {}", followerId);
-            evictCacheForFollowers(followerId);
+            evictNewFeedCacheForFollowers(followerId);
         });
-        evictCacheForFollowers(userId);
+        evictNewFeedCacheForFollowers(userId);
     }
 
-    public void evictCacheForFollowers(String followerId) {
+    public void evictNewFeedCacheForFollowers(String followerId) {
         Cache cache = cacheManager.getCache("postsByUser");
         if(cache.get(followerId + "_0")!= null) {
             cache.evictIfPresent(followerId + "_0");
@@ -143,6 +167,7 @@ public class PostService {
 
     }
 
+    @Async
     public void evictAllCacheForFollower(String followerId) {
         Cache cache = cacheManager.getCache("postsByUser");
         cache.evict(followerId + "_0");

@@ -8,14 +8,12 @@ import com.intuit.be_a_friend.exceptions.DuplicateUserInformationException;
 import com.intuit.be_a_friend.factory.ValidatorFactory;
 import com.intuit.be_a_friend.repositories.FollowerRepository;
 import com.intuit.be_a_friend.repositories.UserRepository;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -111,7 +109,8 @@ public class UserService {
             followerObj.setFollowingId(followerOpt.getUserId());
             followerRepository.save(followerObj);
             userRepository.saveAll(List.of(userOpt, followerOpt));
-            postService.updateCache(followerOpt.getUserId());
+            postService.updateNewsFeedCache(followerOpt.getUserId());
+            postService.evictFollowersCache(userOpt.getUserId());
             logger.info("User {} successfully followed user {}", userName, followerUserName);
             return true;
         }
@@ -130,7 +129,7 @@ public class UserService {
             logger.error("User not found: {} or {}", username, unfollowUser);
             throw new IllegalArgumentException("User not found");
         }
-
+        postService.evictFollowersCache(user.getUserId());
         postService.evictAllCacheForFollower(user.getUserId());
 
         Follower follower = followerRepository.findByFollowingIdAndSubscriberId(unfollowUserInfo.getUserId(), user.getUserId());

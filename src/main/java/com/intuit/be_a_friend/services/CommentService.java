@@ -12,6 +12,7 @@ import com.intuit.be_a_friend.repositories.CommentRepository;
 import com.intuit.be_a_friend.repositories.LikeRepository;
 import com.intuit.be_a_friend.repositories.PostRepository;
 import com.intuit.be_a_friend.repositories.UserRepository;
+import com.mysql.cj.jdbc.exceptions.MysqlDataTruncation;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -65,7 +66,7 @@ public class CommentService {
             @Parameter(description = "ID of the post to comment on") Long postId,
             @Parameter(description = "ID of the user adding the comment") String userId,
             @Parameter(description = "Content of the comment") String content
-    ) throws  PostNotFoundException {
+    ) throws  PostNotFoundException, MysqlDataTruncation {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new PostNotFoundException(String.format("Post %s not found", postId)));
 
@@ -125,7 +126,7 @@ public class CommentService {
             @Parameter(description = "ID of the comment to update") Long commentId,
             @Parameter(description = "ID of the user making the request") String userId,
             @Parameter(description = "New content for the comment") String newContent
-    ) throws CommentNotFoundException, AccessDeniedException {
+    ) throws CommentNotFoundException, AccessDeniedException , MysqlDataTruncation{
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new CommentNotFoundException(String.format("Comment id %s not found", commentId)));
 
@@ -153,7 +154,7 @@ public class CommentService {
         Pageable pageable = PageRequest.of(page, 10);
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new PostNotFoundException(String.format("Post %s not found", postId)));
-        Page<Comment> commentPage =  commentRepository.findByPostAndParentCommentIsNull(post, pageable);
+        Page<Comment> commentPage =  commentRepository.findByPostAndParentCommentIsNullOrderByLikesDescAndCreatedDateDesc(post.getId(), pageable);
         return commentPage.map(this::commentResponsetDTO);
     }
 
@@ -174,7 +175,7 @@ public class CommentService {
         Pageable pageable = PageRequest.of(page, 10);
         Comment parentComment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new CommentNotFoundException(String.format("Parent comment id %s not found", commentId)));
-        return commentRepository.findByParentComment(parentComment, pageable).map(this::commentResponsetDTO);
+        return commentRepository.findByParentComment(parentComment.getId(), pageable).map(this::commentResponsetDTO);
     }
 
     @Operation(summary = "Like a comment", description = "Adds a like to a comment.")
@@ -191,7 +192,11 @@ public class CommentService {
         });
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new CommentNotFoundException(String.format("Parent comment id %s not found", commentId)));
-        comment.addLike();
+        if(isLike) {
+            comment.addLike();
+        } else {
+            comment.addDislike();
+        }
         LikeEO likeEO = new LikeEO();
         likeEO.setComment(comment);
         likeEO.setUser(userId);
@@ -215,6 +220,7 @@ public class CommentService {
             commentRequestDTO.setParentCommentId(comment.getParentComment().getId());
         }
         commentRequestDTO.setLikes(comment.getLikes());
+        commentRequestDTO.setDislikes(comment.getDislikes());
         return commentRequestDTO;
     }
 
@@ -257,7 +263,14 @@ public class CommentService {
         LikeEO likeEO = likeRepository.findByCommentIdAndUserAndLike(commentId, userId, isLike)
                 .orElseThrow(() -> new AccessDeniedException("Like/Dislike not found or user not authorized"));
 
-        likeRepository.delete(likeEO);
+        Optional<Comment> comment = commentRepository.findById(commentId);
+        if(isLike) {
+            comment.get().subLike();
+        } else {
+            comment.get().subDislike();
+        }
+        commentRepository.save(comment.get());
+         likeRepository.delete(likeEO);
     }
 
 

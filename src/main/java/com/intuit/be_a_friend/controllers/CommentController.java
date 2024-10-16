@@ -11,6 +11,7 @@ import com.intuit.be_a_friend.exceptions.PostNotFoundException;
 import com.intuit.be_a_friend.services.CommentService;
 import com.intuit.be_a_friend.services.UserService;
 import com.intuit.be_a_friend.utils.JwtUtil;
+import com.mysql.cj.jdbc.exceptions.MysqlDataTruncation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,7 +37,7 @@ public class CommentController {
     JwtUtil jwtUtil;
 
     @PostMapping("/post/{postId}")
-    public ResponseEntity<CommentResponseDTO> addComment(@RequestHeader("Authorization") String token,@PathVariable Long postId, @RequestBody CommentRequestDTO request) throws PostNotFoundException, CommentNotFoundException {
+    public ResponseEntity<CommentResponseDTO> addComment(@RequestHeader("Authorization") String token,@PathVariable Long postId, @RequestBody CommentRequestDTO request) throws PostNotFoundException, MysqlDataTruncation {
         String username = jwtUtil.extractUsername(token.substring(7));
         UserInfo userInfo =  userService.getUserInfoByUserName(username);
         if (userInfo == null) {
@@ -49,7 +50,7 @@ public class CommentController {
     }
 
     @DeleteMapping("/{commentId}")
-    public ResponseEntity<CommentResponseDTO> addComment(@RequestHeader("Authorization") String token,@PathVariable Long commentId) throws PostNotFoundException, CommentNotFoundException, AccessDeniedException {
+    public ResponseEntity<CommentResponseDTO> addComment(@RequestHeader("Authorization") String token,@PathVariable Long commentId) throws MysqlDataTruncation, CommentNotFoundException, AccessDeniedException {
         String username = jwtUtil.extractUsername(token.substring(7));
         UserInfo userInfo =  userService.getUserInfoByUserName(username);
         if (userInfo == null) {
@@ -62,7 +63,7 @@ public class CommentController {
 
 
     @PutMapping("/{commentId}")
-    public ResponseEntity<CommentResponseDTO> updateComment(@RequestHeader("Authorization") String token, @PathVariable Long commentId, @RequestBody CommentRequestDTO request) throws CommentNotFoundException, AccessDeniedException {
+    public ResponseEntity<CommentResponseDTO> updateComment(@RequestHeader("Authorization") String token, @PathVariable Long commentId, @RequestBody CommentRequestDTO request) throws CommentNotFoundException, AccessDeniedException, MysqlDataTruncation {
         String username = jwtUtil.extractUsername(token.substring(7));
         UserInfo userInfo = userService.getUserInfoByUserName(username);
         if (userInfo == null) {
