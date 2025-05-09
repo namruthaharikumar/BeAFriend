@@ -9,6 +9,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,14 +35,47 @@ public class Comment implements Serializable {
 
     private String requestId;
 
+    @Column(nullable = false, length = 200)
     private String content;
     private int likes;
+    private int dislikes;
     private int depth;
+
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
 
     // Getters, Setters, Constructors
 
     public void addLike() {
         this.likes++;
+    }
+
+    public void addDislike() {
+        this.dislikes++;
+    }
+
+    public void subLike() {
+        this.likes--;
+    }
+    public void subDislike() {
+        this.dislikes--;
+    }
+
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
 }

@@ -14,6 +14,7 @@ import com.intuit.be_a_friend.repositories.PostRepository;
 import com.intuit.be_a_friend.repositories.UserRepository;
 import com.intuit.be_a_friend.services.CommentService;
 import com.intuit.be_a_friend.services.PostService;
+import com.mysql.cj.jdbc.exceptions.MysqlDataTruncation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -60,7 +61,7 @@ class CommentServiceTest {
 
 
     @Test
-    void testAddComment() throws PostNotFoundException {
+    void testAddComment() throws PostNotFoundException, MysqlDataTruncation {
         String username = "testUser";
         String commentContent = "This is a test comment";
 
@@ -123,7 +124,7 @@ class CommentServiceTest {
     }
 
     @Test
-    void testUpdateComment_Success() throws CommentNotFoundException, AccessDeniedException {
+    void testUpdateComment_Success() throws CommentNotFoundException, AccessDeniedException, MysqlDataTruncation {
         Long commentId = 1L;
         String userId = "user123";
         String newContent = "Updated content";
@@ -207,6 +208,7 @@ class CommentServiceTest {
         Long commentId = 1L;
         String userId = "user123";
         LikeEO likeEO = getLikeEO(commentId, userId, true);
+        when(commentRepository.findById(commentId)).thenReturn(Optional.of(getComment(commentId)));
 
         when(likeRepository.findByCommentIdAndUserAndLike(commentId, userId, true)).thenReturn(Optional.of(likeEO));
 
@@ -222,6 +224,7 @@ class CommentServiceTest {
         LikeEO likeEO = getLikeEO(commentId, userId, true);
 
         when(likeRepository.findByCommentIdAndUserAndLike(commentId, userId, true)).thenReturn(Optional.of(likeEO));
+        when(commentRepository.findById(commentId)).thenReturn(Optional.of(getComment(commentId)));
 
         commentService.undoLikeOrDislike(commentId, userId, true);
 
@@ -233,7 +236,7 @@ class CommentServiceTest {
         Long commentId = 1L;
         String userId = "user123";
         LikeEO likeEO = getLikeEO(commentId, userId, false);
-
+        when(commentRepository.findById(commentId)).thenReturn(Optional.of(getComment(commentId)));
         when(likeRepository.findByCommentIdAndUserAndLike(commentId, userId, false)).thenReturn(Optional.of(likeEO));
 
         commentService.undoLikeOrDislike(commentId, userId, false);
@@ -359,12 +362,12 @@ class CommentServiceTest {
         comment2.setPost(post);
         Pageable pageable = PageRequest.of(0, 10);
         when(postRepository.findById(postId)).thenReturn(Optional.of(post));
-        when(commentRepository.findByPostAndParentCommentIsNull(post,pageable)).thenReturn((new PageImpl<>(Arrays.asList(comment1, comment2),pageable,2)));
+        when(commentRepository.findByPostAndParentCommentIsNullOrderByLikesDescAndCreatedDateDesc(post.getId(),pageable)).thenReturn((new PageImpl<>(Arrays.asList(comment1, comment2),pageable,2)));
 
         Page<CommentResponseDTO> topLevelComments = commentService.getTopLevelComments(postId, 0);
 
         assertEquals(2, topLevelComments.getTotalElements());
-        verify(commentRepository, times(1)).findByPostAndParentCommentIsNull(post,pageable);
+        verify(commentRepository, times(1)).findByPostAndParentCommentIsNullOrderByLikesDescAndCreatedDateDesc(post.getId(),pageable);
     }
 
     @Test
@@ -384,12 +387,12 @@ class CommentServiceTest {
         reply2.setParentComment(parentComment);
         Pageable pageable = PageRequest.of(0, 10);
         when(commentRepository.findById(commentId)).thenReturn(Optional.of(parentComment));
-        when(commentRepository.findByParentComment(parentComment,pageable)).thenReturn((new PageImpl<>(Arrays.asList(reply1, reply2),pageable,2)));
+        when(commentRepository.findByParentComment(parentComment.getId(),pageable)).thenReturn((new PageImpl<>(Arrays.asList(reply1, reply2),pageable,2)));
 
         Page<CommentResponseDTO> replies = commentService.getReplies(commentId,0);
 
         assertEquals(2, replies.getTotalElements());
-        verify(commentRepository, times(1)).findByParentComment(parentComment,pageable);
+        verify(commentRepository, times(1)).findByParentComment(parentComment.getId(),pageable);
     }
 
     @Test

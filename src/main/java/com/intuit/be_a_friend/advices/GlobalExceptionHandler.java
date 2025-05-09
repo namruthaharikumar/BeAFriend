@@ -8,6 +8,7 @@ import io.jsonwebtoken.MalformedJwtException;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
@@ -107,7 +108,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MysqlDataTruncation.class)
     public ResponseEntity<ErrorResponse> handleMysqlDataTruncation(MysqlDataTruncation ex) {
         logger.error("MysqlDataTruncation: {}", ex.getMessage(), ex);
-        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.BAD_REQUEST, "Data too long for column");
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.BAD_REQUEST, "Data too long");
+        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+        logger.error("DataIntegrityViolationException: {}", ex.getMessage(), ex);
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.BAD_REQUEST, "Data too long");
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
@@ -138,6 +146,7 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = new ErrorResponse(HttpStatus.valueOf(ex.getStatusCode()), ex.getMessage());
         return new ResponseEntity<>(errorResponse, HttpStatus.valueOf(ex.getStatusCode()));
     }
+
 
 
 }

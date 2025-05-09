@@ -58,6 +58,7 @@ class UserSignupDataValidatorTest {
     void testValidate_MissingEmail() {
         UserDTO userDTO = new UserDTO();
         userDTO.setUsername("testuser");
+        userDTO.setEmail("");
         userDTO.setPassword("password");
 
         Exception exception = assertThrows(InsufficientInformationException.class, () -> {
